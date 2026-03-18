@@ -10,7 +10,7 @@ import Foundation
 ///
 /// By conforming to `ApiSetupProtocol`, each endpoint enum centralizes its own request-building logic,
 /// ensuring consistency and reducing boilerplate in your networking client.
-protocol ApiSetupProtocol {
+public protocol ApiSetupProtocol {
 
     /// A fully configured URLRequest for this endpoint.
     var request: URLRequest { get throws }
@@ -32,7 +32,7 @@ protocol ApiSetupProtocol {
 
 }
 
-enum HttpMethod: String {
+public enum HttpMethod: String {
     case get = "GET"
     case post = "POST"
     case put = "PUT"

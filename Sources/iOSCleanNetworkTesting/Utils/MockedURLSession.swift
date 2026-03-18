@@ -1,24 +1,21 @@
 import Foundation
+import iOSCleanNetwork
 
-extension URLSession: NetworkSessionProtocol {
+/// Use to mock URLSession calls
+public final class MockedURLSession: NetworkSessionProtocol {
+
+    public let jsonReader = JSonReader()
 
     public func data(for apiRequestSetup: ApiSetupProtocol) async throws -> (Data, URLResponse) {
-        let request = try apiRequestSetup.request
-
-        do {
-            let (data, response) = try await self.data(for: request)
-
-            let validated = try NetworkValidation.validate(
-                data: data,
-                response: response,
-                for: request
-            )
-
-            return (validated, response)
-        } catch {
-            // TODO: Log request fails
-            throw error
+        guard let apiRequestSetup = apiRequestSetup as? URLSessionSetupProtocol else {
+            throw Errors.missingJsonFileName
         }
+
+        let jsonFileName = apiRequestSetup.jsonFileName
+
+        let jsonData = try jsonReader.localJSon(jsonFileName)
+
+        return (jsonData, HTTPURLResponse())
     }
 
     public func dataWithUnauthorizedRefreshRetry(
@@ -36,6 +33,16 @@ extension URLSession: NetworkSessionProtocol {
 
             return try await data(for: endpoint)
         }
+    }
+
+}
+
+// MARK: - Helping Structure
+
+public extension MockedURLSession {
+
+    enum Errors: Error {
+        case missingJsonFileName
     }
 
 }

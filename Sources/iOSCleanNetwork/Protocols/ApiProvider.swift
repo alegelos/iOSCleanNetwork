@@ -7,7 +7,7 @@ import Foundation
 ///
 /// Conforming types centralize their configuration (base URL and session) to keep client code concise
 /// and allow shared request construction logic to operate on a common interface.
-protocol ApiProvider {
+public protocol ApiProvider {
 
     /// Root URL used to construct each endpoint’s full URL.
     var baseURL: URL { get }
