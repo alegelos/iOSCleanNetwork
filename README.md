@@ -4,17 +4,19 @@
 
 If you are an AI agent generating code from this repository, read [`README_AI.md`](./README_AI.md) before writing any files.
 
-`README_AI.md` defines the required naming conventions, folder structure, testing approach, spy conventions, and output format expected for projects built on top of this framework.
+`README_AI.md` defines the required naming conventions, folder structure, domain mapping approach, testing approach, spy conventions, and output format expected for projects built on top of this framework.
 
 In particular, it explains that:
 
 - endpoint configuration must use `*Setup`
 - request executors must use `*Provider`
+- AI-generated integrations should create a `Domain` folder with feature protocols and models
+- providers should conform to the Domain protocol when that architecture is used
+- API responses should map into Domain models through a `domain` computed property
 - tests must reuse the same production `Provider`
 - JSON-backed testing should use `MockedURLSession`
 - concrete spies and service-level spy aggregators are handwritten by the consumer
 - the final generated result must preserve the host project structure and be deliverable as a zip file
-
 
 `iOSCleanNetwork` can be used in two different ways:
 
@@ -55,8 +57,10 @@ That usually includes:
 
 - one or more `*Setup` types conforming to `ApiSetupProtocol`
 - one or more `*Provider` types that perform the request and decode the response
+- a `Domain` folder with feature protocols and domain models when the project uses that architecture
 - request payload models using the `*DTO` naming
 - transport response models using the `*Response` naming
+- response-to-domain mappers declared as a `domain` computed property
 - JSON fixtures for testing
 - tests using the same production `Provider`
 - concrete provider spies written by hand on top of `ProviderSpyProtocol`
@@ -71,9 +75,9 @@ After the AI generates the integration code, you typically:
 
 1. add the generated Swift and JSON files to your host project
 2. verify that the folders match your project structure
-3. review the generated `Setup`, `Provider`, DTOs, responses, fixtures, and tests
+3. review the generated Domain models, `Setup`, `Provider`, DTOs, responses, mappers, fixtures, and tests
 4. run the tests
-5. wire the generated `Provider` into your app or SDK
+5. wire the generated provider or Domain protocol into your app or SDK
 
 You can use the rest of this README to understand:
 
@@ -85,16 +89,39 @@ You can use the rest of this README to understand:
 
 If you do not want to use AI generation, the rest of this README explains the conventions, structure, and testing approach required to build the integration manually.
 
+## Optional Domain layer recommendation
+
+A common architecture is to expose a protocol from the Domain layer and make the Data provider conform to it.
+
+When you do that, prefer naming the protocol after the **feature it provides**, not after the raw API name.
+
+Examples:
+
+- the API may be **Apigee**
+- the Domain protocol may be `AgiGatewayProtocol`
+- or it may be `SessionManagerProtocol`
+
+Other examples:
+
+- `PaymentsProtocol`
+- `ProfileGatewayProtocol`
+- `UserSessionProtocol`
+
+That naming is optional and depends on the project architecture. If your project is simpler, you can skip the extra Domain abstraction. But when a Domain layer exists, it is usually better for the protocol to describe the feature or capability rather than the transport source.
+
 ## For AI agents
 
 If you are an AI agent generating code from this repository, read [`README_AI.md`](./README_AI.md) before writing any files.
 
-`README_AI.md` defines the required naming conventions, folder structure, testing approach, spy conventions, and output format expected for projects built on top of this framework.
+`README_AI.md` defines the required naming conventions, folder structure, domain mapping approach, testing approach, spy conventions, and output format expected for projects built on top of this framework.
 
 In particular, it explains that:
 
 - endpoint configuration must use `*Setup`
 - request executors must use `*Provider`
+- AI-generated integrations should create a `Domain` folder with feature protocols and models
+- providers should conform to the Domain protocol when that architecture is used
+- API responses should map into Domain models through a `domain` computed property
 - tests must reuse the same production `Provider`
 - JSON-backed testing should use `MockedURLSession`
 - concrete spies and service-level spy aggregators are handwritten by the consumer
@@ -107,7 +134,13 @@ The package is based on two simple conventions:
 - types ending in **`Setup`** define endpoint configuration
 - types ending in **`Provider`** execute the request and decode the response
 
-It also keeps the transport layer abstract through `NetworkSessionProtocol`, so tests do not require mocking the Provider at all. You can keep the exact same production Provider, inject `MockedURLSession`, provide the expected JSON fixtures, and let the same decoding flow used in production return the response.
+When a project uses a Domain layer, the expected split is:
+
+- **Domain** exposes feature protocols and domain models
+- **Data** contains the transport-specific `Setup`, `Provider`, DTOs, responses, and response mappers
+- **Provider** decodes transport responses and returns Domain models
+
+It also keeps the transport layer abstract through `NetworkSessionProtocol`, so tests do not require mocking the Provider at all. You can keep the exact same production Provider, inject `MockedURLSession`, provide the expected JSON fixtures, and let the same decoding and mapping flow used in production return the final Domain model.
 
 ## Package products
 
@@ -164,13 +197,33 @@ A `Provider` is responsible for:
 - building the correct `Setup`
 - executing the request through the injected session
 - decoding the response model
-- returning the decoded result
+- mapping transport responses into Domain models when the project uses a Domain layer
+- returning the final model expected by the feature
 
 Examples:
 
 - `GitHubUserAPIProvider`
 - `StripeAPIProvider`
 - `SpotifyAPIProvider`
+
+### Domain protocols
+
+When a Domain layer exists, define the protocol in the Domain layer and make the Data provider conform to it.
+
+Prefer protocol names that describe the feature instead of the API vendor or API product name.
+
+Good examples:
+
+- `PaymentsProtocol`
+- `SessionManagerProtocol`
+- `AgiGatewayProtocol`
+
+Less desirable in a Domain layer:
+
+- `StripeAPIProviding`
+- `ApigeeAPIProviding`
+
+This is not mandatory for every project. It is an architectural option. But if you introduce the Domain layer, keep the protocol aligned with the feature.
 
 ## Transport model naming
 
@@ -187,6 +240,61 @@ Examples:
 - `CreateCardTokenDTO`
 
 This keeps transport models easy to identify at a glance.
+
+## Domain model mapping
+
+If your project uses a Domain layer, do the mapping in the Data layer.
+
+A common structure is:
+
+- `Domain/Protocols/`
+- `Domain/Models/`
+- `Data/APIs/.../RequestsDTOs/`
+- `Data/APIs/.../Responses/`
+
+Each transport response can expose a `domain` computed property that maps it into the corresponding Domain model.
+
+Example:
+
+```swift
+import Foundation
+
+struct PaymentIntent: Equatable {
+    let identifier: String
+    let status: String
+    let clientSecret: String?
+}
+
+struct StripePaymentIntentResponse: Decodable {
+    let id: String
+    let status: String
+    let clientSecret: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case status
+        case clientSecret = "client_secret"
+    }
+}
+
+extension StripePaymentIntentResponse {
+    // MARK: - Domain Mapper
+
+    var domain: PaymentIntent {
+        PaymentIntent(
+            identifier: id,
+            status: status,
+            clientSecret: clientSecret
+        )
+    }
+}
+```
+
+That keeps:
+
+- transport details in Data
+- presenter-facing types in Domain
+- mapping close to the API response that owns the transport shape
 
 ## Installation
 
@@ -221,14 +329,41 @@ let package = Package(
 
 ## Example: one API with both a GET service and a POST service
 
-This example shows the most common setup in a single module:
+This example shows a common setup in a single module:
 
 - one `GET` endpoint without body
 - one `POST` endpoint with body
 - one `Setup`
 - one `Provider`
+- one Domain protocol
+- one Domain model
+- one transport response mapper
 
-### 1. Define request DTOs and response models
+### 1. Define the Domain model and Domain protocol
+
+```swift
+import Foundation
+
+struct PaymentIntent: Equatable {
+    let identifier: String
+    let status: String
+    let clientSecret: String?
+}
+
+protocol PaymentsProtocol {
+    func retrievePaymentIntent(
+        secretAPIKey: String,
+        paymentIntentID: String
+    ) async throws -> PaymentIntent
+
+    func createPaymentIntent(
+        secretAPIKey: String,
+        paymentIntentDTO: CreatePaymentIntentDTO
+    ) async throws -> PaymentIntent
+}
+```
+
+### 2. Define request DTOs and response models
 
 ```swift
 import Foundation
@@ -256,9 +391,21 @@ struct StripePaymentIntentResponse: Decodable {
         case clientSecret = "client_secret"
     }
 }
+
+extension StripePaymentIntentResponse {
+    // MARK: - Domain Mapper
+
+    var domain: PaymentIntent {
+        PaymentIntent(
+            identifier: id,
+            status: status,
+            clientSecret: clientSecret
+        )
+    }
+}
 ```
 
-### 2. Define a `Setup`
+### 3. Define a `Setup`
 
 ```swift
 import Foundation
@@ -367,25 +514,13 @@ enum StripeAPISetup: ApiSetupProtocol {
 }
 ```
 
-### 3. Define a `Provider`
+### 4. Define a `Provider`
 
 ```swift
 import Foundation
 import iOSCleanNetwork
 
-protocol StripeAPIProviding {
-    func retrievePaymentIntent(
-        secretAPIKey: String,
-        paymentIntentID: String
-    ) async throws -> StripePaymentIntentResponse
-
-    func createPaymentIntent(
-        secretAPIKey: String,
-        paymentIntentDTO: CreatePaymentIntentDTO
-    ) async throws -> StripePaymentIntentResponse
-}
-
-final class StripeAPIProvider: StripeAPIProviding {
+final class StripeAPIProvider: PaymentsProtocol {
     private let baseURL: URL
     private let session: any NetworkSessionProtocol
 
@@ -400,7 +535,7 @@ final class StripeAPIProvider: StripeAPIProviding {
     func retrievePaymentIntent(
         secretAPIKey: String,
         paymentIntentID: String
-    ) async throws -> StripePaymentIntentResponse {
+    ) async throws -> PaymentIntent {
         let setup = StripeAPISetup.retrievePaymentIntent(
             baseURL: baseURL,
             secretAPIKey: secretAPIKey,
@@ -408,13 +543,14 @@ final class StripeAPIProvider: StripeAPIProviding {
         )
 
         let (data, _) = try await session.data(for: setup)
-        return try JSONDecoder().decode(StripePaymentIntentResponse.self, from: data)
+        let response = try JSONDecoder().decode(StripePaymentIntentResponse.self, from: data)
+        return response.domain
     }
 
     func createPaymentIntent(
         secretAPIKey: String,
         paymentIntentDTO: CreatePaymentIntentDTO
-    ) async throws -> StripePaymentIntentResponse {
+    ) async throws -> PaymentIntent {
         let setup = StripeAPISetup.createPaymentIntent(
             baseURL: baseURL,
             secretAPIKey: secretAPIKey,
@@ -422,17 +558,18 @@ final class StripeAPIProvider: StripeAPIProviding {
         )
 
         let (data, _) = try await session.data(for: setup)
-        return try JSONDecoder().decode(StripePaymentIntentResponse.self, from: data)
+        let response = try JSONDecoder().decode(StripePaymentIntentResponse.self, from: data)
+        return response.domain
     }
 }
 ```
 
-### 4. Use the `Provider`
+### 5. Use the `Provider`
 
 ```swift
 import Foundation
 
-let provider = StripeAPIProvider(
+let provider: PaymentsProtocol = StripeAPIProvider(
     baseURL: URL(string: "https://api.stripe.com/v1")!
 )
 
@@ -455,11 +592,12 @@ let createdPaymentIntent = try await provider.createPaymentIntent(
 
 This keeps the pattern easy to read:
 
-- `StripeAPISetup` contains both endpoint configurations
-- `StripeAPIProvider` contains both service methods
-- the `GET` endpoint has no body
-- the `POST` endpoint encodes a DTO into the body
-
+- `StripeAPISetup` contains endpoint configuration
+- `StripeAPIProvider` contains request execution
+- `PaymentsProtocol` expresses the feature contract
+- `StripePaymentIntentResponse` stays in the Data layer
+- `PaymentIntent` is the model returned to the feature or presenter
+- the mapper lives next to the transport response
 
 ## Unauthorized retry and token refresh
 
@@ -500,11 +638,20 @@ final class SampleApisGatewayProvider: ApisGatewayProtocol {
 }
 ```
 
-### Example Provider using refresh retry
+### Example provider using refresh retry and Domain mapping
 
 ```swift
 import Foundation
 import iOSCleanNetwork
+
+struct UserProfile {
+    let identifier: String
+    let displayName: String
+}
+
+protocol ProfileGatewayProtocol {
+    func fetchProfile() async throws -> UserProfile
+}
 
 struct SpotifyProfileResponse: Decodable {
     let id: String
@@ -513,6 +660,17 @@ struct SpotifyProfileResponse: Decodable {
     enum CodingKeys: String, CodingKey {
         case id
         case displayName = "display_name"
+    }
+}
+
+extension SpotifyProfileResponse {
+    // MARK: - Domain Mapper
+
+    var domain: UserProfile {
+        UserProfile(
+            identifier: id,
+            displayName: displayName
+        )
     }
 }
 
@@ -557,7 +715,7 @@ enum SpotifyAPISetup: ApiSetupProtocol {
     var queryItems: [URLQueryItem] { [] }
 }
 
-final class SpotifyAPIProvider {
+final class SpotifyAPIProvider: ProfileGatewayProtocol {
     private let baseURL: URL
     private let apiAccessProvider: ApisGatewayProtocol
     private let session: any NetworkSessionProtocol
@@ -572,7 +730,7 @@ final class SpotifyAPIProvider {
         self.session = session
     }
 
-    func fetchProfile() async throws -> SpotifyProfileResponse {
+    func fetchProfile() async throws -> UserProfile {
         let (data, _) = try await session.dataWithUnauthorizedRefreshRetry(
             apiAccessProvider: apiAccessProvider,
             buildEndpoint: { accessToken in
@@ -583,7 +741,8 @@ final class SpotifyAPIProvider {
             }
         )
 
-        return try JSONDecoder().decode(SpotifyProfileResponse.self, from: data)
+        let response = try JSONDecoder().decode(SpotifyProfileResponse.self, from: data)
+        return response.domain
     }
 }
 ```
@@ -610,6 +769,7 @@ That means:
 - same Provider
 - same Setup
 - same decode logic
+- same mapping logic
 - different session implementation only
 
 ## Extra requirement for fixture-based testing
@@ -644,7 +804,9 @@ When `data(for:)` is called:
 3. it reads `jsonFileName`
 4. it loads the JSON file using `JSonReader`
 5. it returns the JSON as `Data`
-6. the same Provider decodes that data and returns the response model
+6. the same Provider decodes that data
+7. the same Provider maps the response to Domain if needed
+8. the same Provider returns the final model
 
 That means you do **not** need to rewrite the Provider for testing.
 
@@ -658,7 +820,7 @@ import iOSCleanNetworkTesting
 
 struct GitHubUserAPIProviderTests {
     @Test
-    func fetchUser_returnsDecodedFixture() async throws {
+    func fetchUser_returnsMappedDomainFixture() async throws {
         // Given
         let baseURL = URL(string: "https://api.github.com")!
         let session = MockedURLSession()
@@ -668,10 +830,10 @@ struct GitHubUserAPIProviderTests {
         )
 
         // When
-        let response = try await provider.fetchUser(username: "octocat")
+        let actual = try await provider.fetchUser(username: "octocat")
 
         // Then
-        #expect(response.login == "octocat")
+        #expect(actual.login == "octocat")
     }
 }
 ```
@@ -703,7 +865,7 @@ That means the repeated boilerplate is small and predictable, but the final conc
 
 ### What the consumer writes by hand
 
-For each provider protocol you want to observe in tests, you usually write one spy manually.
+For each provider or Domain protocol you want to observe in tests, you usually write one spy manually.
 
 That spy typically contains:
 
@@ -725,33 +887,45 @@ The pattern is always the same:
 import Foundation
 import iOSCleanNetworkTesting
 
-final class GitHubUserAPIProviderSpy: ProviderSpyProtocol {
+final class PaymentsProviderSpy: ProviderSpyProtocol {
     enum MethodKey: String, Hashable, CaseIterable {
-        case fetchUser
-        case fetchRepositories
+        case retrievePaymentIntent
+        case createPaymentIntent
     }
 
     var invocationsCount: [MethodKey: Int] = [:]
     var failingMethos: [(method: MethodKey, error: Error)] = []
 
-    private let wrappedProvider: any GitHubUserAPIProviding
+    private let wrappedProvider: any PaymentsProtocol
 
-    init(wrapping wrappedProvider: any GitHubUserAPIProviding) {
+    init(wrapping wrappedProvider: any PaymentsProtocol) {
         self.wrappedProvider = wrappedProvider
     }
 }
 
-extension GitHubUserAPIProviderSpy: GitHubUserAPIProviding {
-    func fetchUser(username: String) async throws -> GitHubUserResponse {
-        increment(.fetchUser)
-        try validateFailingMethods(method: .fetchUser)
-        return try await wrappedProvider.fetchUser(username: username)
+extension PaymentsProviderSpy: PaymentsProtocol {
+    func retrievePaymentIntent(
+        secretAPIKey: String,
+        paymentIntentID: String
+    ) async throws -> PaymentIntent {
+        increment(.retrievePaymentIntent)
+        try validateFailingMethods(method: .retrievePaymentIntent)
+        return try await wrappedProvider.retrievePaymentIntent(
+            secretAPIKey: secretAPIKey,
+            paymentIntentID: paymentIntentID
+        )
     }
 
-    func fetchRepositories(username: String) async throws -> [GitHubRepositoryResponse] {
-        increment(.fetchRepositories)
-        try validateFailingMethods(method: .fetchRepositories)
-        return try await wrappedProvider.fetchRepositories(username: username)
+    func createPaymentIntent(
+        secretAPIKey: String,
+        paymentIntentDTO: CreatePaymentIntentDTO
+    ) async throws -> PaymentIntent {
+        increment(.createPaymentIntent)
+        try validateFailingMethods(method: .createPaymentIntent)
+        return try await wrappedProvider.createPaymentIntent(
+            secretAPIKey: secretAPIKey,
+            paymentIntentDTO: paymentIntentDTO
+        )
     }
 }
 ```
@@ -786,19 +960,19 @@ Typical responsibilities:
 import Foundation
 import Testing
 
-final class GitHubProfileServiceSpy: GitHubProfileService {
-    private let userAPIProviderSpy: GitHubUserAPIProviderSpy
-    private let authGatewayProviderSpy: GitHubAuthGatewayProviderSpy
+final class CheckoutFlowServiceSpy: CheckoutFlowService {
+    private let paymentsProviderSpy: PaymentsProviderSpy
+    private let authGatewayProviderSpy: AuthGatewayProviderSpy
 
     init(
-        userAPIProvider: any GitHubUserAPIProviding,
-        authGatewayProvider: any GitHubAuthGatewayProviding
+        paymentsProvider: any PaymentsProtocol,
+        authGatewayProvider: any AuthGatewayProtocol
     ) {
-        self.userAPIProviderSpy = GitHubUserAPIProviderSpy(wrapping: userAPIProvider)
-        self.authGatewayProviderSpy = GitHubAuthGatewayProviderSpy(wrapping: authGatewayProvider)
+        self.paymentsProviderSpy = PaymentsProviderSpy(wrapping: paymentsProvider)
+        self.authGatewayProviderSpy = AuthGatewayProviderSpy(wrapping: authGatewayProvider)
 
         super.init(
-            userAPIProvider: userAPIProviderSpy,
+            paymentsProvider: paymentsProviderSpy,
             authGatewayProvider: authGatewayProviderSpy
         )
     }
@@ -810,24 +984,24 @@ final class GitHubProfileServiceSpy: GitHubProfileService {
 ```swift
 import Testing
 
-extension GitHubProfileServiceSpy {
+extension CheckoutFlowServiceSpy {
     enum MethodsKeys {
-        case userAPI([(GitHubUserAPIProviderSpy.MethodKey, Int)])
-        case authGateway([(GitHubAuthGatewayProviderSpy.MethodKey, Int)])
+        case payments([(PaymentsProviderSpy.MethodKey, Int)])
+        case authGateway([(AuthGatewayProviderSpy.MethodKey, Int)])
 
-        static func userAPI(_ keys: GitHubUserAPIProviderSpy.MethodKey...) -> Self {
-            .userAPI(keys.map { ($0, 1) })
+        static func payments(_ keys: PaymentsProviderSpy.MethodKey...) -> Self {
+            .payments(keys.map { ($0, 1) })
         }
 
-        static func userAPI(_ items: (GitHubUserAPIProviderSpy.MethodKey, times: Int)...) -> Self {
-            .userAPI(items.map { ($0.0, $0.times) })
+        static func payments(_ items: (PaymentsProviderSpy.MethodKey, times: Int)...) -> Self {
+            .payments(items.map { ($0.0, $0.times) })
         }
 
-        static func authGateway(_ keys: GitHubAuthGatewayProviderSpy.MethodKey...) -> Self {
+        static func authGateway(_ keys: AuthGatewayProviderSpy.MethodKey...) -> Self {
             .authGateway(keys.map { ($0, 1) })
         }
 
-        static func authGateway(_ items: (GitHubAuthGatewayProviderSpy.MethodKey, times: Int)...) -> Self {
+        static func authGateway(_ items: (AuthGatewayProviderSpy.MethodKey, times: Int)...) -> Self {
             .authGateway(items.map { ($0.0, $0.times) })
         }
     }
@@ -837,7 +1011,7 @@ extension GitHubProfileServiceSpy {
         sourceLocation: SourceLocation = #_sourceLocation
     ) {
         enum Provider: CaseIterable {
-            case userAPI
+            case payments
             case authGateway
         }
 
@@ -845,9 +1019,9 @@ extension GitHubProfileServiceSpy {
 
         for expectedCall in expectedCalls {
             switch expectedCall {
-            case .userAPI(let expected):
-                seenProviders.insert(.userAPI)
-                userAPIProviderSpy.assertExpectedInvocations(expected, sourceLocation: sourceLocation)
+            case .payments(let expected):
+                seenProviders.insert(.payments)
+                paymentsProviderSpy.assertExpectedInvocations(expected, sourceLocation: sourceLocation)
 
             case .authGateway(let expected):
                 seenProviders.insert(.authGateway)
@@ -857,8 +1031,8 @@ extension GitHubProfileServiceSpy {
 
         for provider in Provider.allCases where seenProviders.contains(provider) == false {
             switch provider {
-            case .userAPI:
-                userAPIProviderSpy.assertExpectedInvocations([], sourceLocation: sourceLocation)
+            case .payments:
+                paymentsProviderSpy.assertExpectedInvocations([], sourceLocation: sourceLocation)
             case .authGateway:
                 authGatewayProviderSpy.assertExpectedInvocations([], sourceLocation: sourceLocation)
             }
@@ -866,7 +1040,7 @@ extension GitHubProfileServiceSpy {
     }
 
     func resetAllCounters() {
-        userAPIProviderSpy.resetInvocationsCount()
+        paymentsProviderSpy.resetInvocationsCount()
         authGatewayProviderSpy.resetInvocationsCount()
     }
 }
@@ -877,21 +1051,21 @@ extension GitHubProfileServiceSpy {
 ```swift
 import Foundation
 
-extension GitHubProfileServiceSpy {
+extension CheckoutFlowServiceSpy {
     enum FailingMethods {
-        case userAPI([(GitHubUserAPIProviderSpy.MethodKey, Error)])
-        case authGateway([(GitHubAuthGatewayProviderSpy.MethodKey, Error)])
+        case payments([(PaymentsProviderSpy.MethodKey, Error)])
+        case authGateway([(AuthGatewayProviderSpy.MethodKey, Error)])
 
-        static func userAPI(
-            _ keys: GitHubUserAPIProviderSpy.MethodKey...,
-            error: Error = GitHubProfileServiceSpyError.forcedFailure
+        static func payments(
+            _ keys: PaymentsProviderSpy.MethodKey...,
+            error: Error = CheckoutFlowServiceSpyError.forcedFailure
         ) -> Self {
-            .userAPI(keys.map { ($0, error) })
+            .payments(keys.map { ($0, error) })
         }
 
         static func authGateway(
-            _ keys: GitHubAuthGatewayProviderSpy.MethodKey...,
-            error: Error = GitHubProfileServiceSpyError.forcedFailure
+            _ keys: AuthGatewayProviderSpy.MethodKey...,
+            error: Error = CheckoutFlowServiceSpyError.forcedFailure
         ) -> Self {
             .authGateway(keys.map { ($0, error) })
         }
@@ -900,8 +1074,8 @@ extension GitHubProfileServiceSpy {
     func failingMethods(_ failingMethods: FailingMethods...) {
         for failingMethod in failingMethods {
             switch failingMethod {
-            case .userAPI(let methods):
-                userAPIProviderSpy.failingMethods(methods)
+            case .payments(let methods):
+                paymentsProviderSpy.failingMethods(methods)
             case .authGateway(let methods):
                 authGatewayProviderSpy.failingMethods(methods)
             }
@@ -909,7 +1083,7 @@ extension GitHubProfileServiceSpy {
     }
 }
 
-private enum GitHubProfileServiceSpyError: Error {
+private enum CheckoutFlowServiceSpyError: Error {
     case forcedFailure
 }
 ```
@@ -923,47 +1097,47 @@ Instead of checking every wrapped spy manually, tests stay short and readable.
 ```swift
 import Testing
 
-struct GitHubProfileServiceTests {
+struct CheckoutFlowServiceTests {
     @Test
-    func loadProfile_succeeds() async throws {
+    func loadPayment_succeeds() async throws {
         // Given
-        let service = GitHubProfileServiceSpy(
-            userAPIProvider: StubGitHubUserAPIProvider.success,
-            authGatewayProvider: StubGitHubAuthGatewayProvider.success
+        let service = CheckoutFlowServiceSpy(
+            paymentsProvider: StubPaymentsProvider.success,
+            authGatewayProvider: StubAuthGatewayProvider.success
         )
         service.resetAllCounters()
 
         // When
-        let actualProfile = try await service.loadProfile(username: "octocat")
+        let actual = try await service.loadPayment()
 
         // Then
-        #expect(actualProfile.login == "octocat")
+        #expect(actual.identifier == "pi_123")
         service.assertExpectedInvocations(
             .authGateway(.accessToken),
-            .userAPI(.fetchUser)
+            .payments(.retrievePaymentIntent)
         )
     }
 
     @Test
-    func loadProfile_throwsWhenUserRequestFails() async throws {
+    func loadPayment_throwsWhenRequestFails() async throws {
         // Given
-        let service = GitHubProfileServiceSpy(
-            userAPIProvider: StubGitHubUserAPIProvider.success,
-            authGatewayProvider: StubGitHubAuthGatewayProvider.success
+        let service = CheckoutFlowServiceSpy(
+            paymentsProvider: StubPaymentsProvider.success,
+            authGatewayProvider: StubAuthGatewayProvider.success
         )
         service.resetAllCounters()
-        service.failingMethods(.userAPI(.fetchUser))
+        service.failingMethods(.payments(.retrievePaymentIntent))
 
         // When
         do {
-            _ = try await service.loadProfile(username: "octocat")
-            Issue.record("Expected loadProfile to throw forcedFailure")
+            _ = try await service.loadPayment()
+            Issue.record("Expected loadPayment to throw forcedFailure")
         } catch {
             // Then
-            #expect(error is GitHubProfileServiceSpyError)
+            #expect(error is CheckoutFlowServiceSpyError)
             service.assertExpectedInvocations(
                 .authGateway(.accessToken),
-                .userAPI(.fetchUser)
+                .payments(.retrievePaymentIntent)
             )
         }
     }
@@ -998,6 +1172,8 @@ The final spy types and test surface are intentionally user-defined.
 
 - `Setup` configures the endpoint
 - `Provider` performs the request and decodes the response
+- a Domain protocol can express the feature contract
+- transport responses can map to Domain models through a `domain` computed property
 - the session is injected
 - authentication remains external through `ApisGatewayProtocol`
 - in tests, the same `Provider` can run unchanged by swapping the session for `MockedURLSession`
