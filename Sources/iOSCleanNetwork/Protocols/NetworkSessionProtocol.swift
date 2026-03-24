@@ -7,7 +7,7 @@ import Foundation
 ///
 /// Conforming types (e.g. `URLSession`) can integrate seamlessly, enabling easy mocking or
 /// alternative transports for testing or customization.
-public protocol NetworkSessionProtocol: AnyObject {
+public protocol NetworkSessionProtocol: AnyObject, Sendable {
 
     @discardableResult
     func data(for apiRequestSetup: ApiSetupProtocol) async throws -> (Data, URLResponse)
