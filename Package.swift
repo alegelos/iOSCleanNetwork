@@ -6,8 +6,7 @@ import PackageDescription
 let package = Package(
     name: "iOSCleanNetwork",
     platforms: [
-        .iOS(.v17),
-        .macOS(.v12)
+        .iOS(.v15)
     ],
     products: [
         .library(
