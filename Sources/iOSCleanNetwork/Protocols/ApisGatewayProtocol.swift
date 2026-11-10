@@ -1,9 +1,10 @@
 import Foundation
 
-/// Defines how to obtain an OAuth access token for calling protected APIs.
+/// The consumer's source of access tokens for protected API requests.
+/// Token acquisition, storage and cache/refresh policy are implemented by the consumer.
 public protocol ApisGatewayProtocol: AnyObject {
 
-    /// Returns a valid OAuth bearer token for accessing protected APIs (e.g., Apigee), not a user identity token.
+    /// Returns a valid access token suitable for the API's authentication scheme.
     ///
     /// - Parameter policy: Determines whether to reuse a cached token or force-refresh.
     /// - Returns: An OAuth access token string suitable for authenticating API requests.
@@ -33,6 +34,6 @@ public enum AccessTokenPolicy: Sendable {
     /// Fetch a fresh token.
     case forceRefresh
 
-    /// A convenient “default” valid for at least 15 min
+    /// Requests a cached token with at least 180 seconds (3 minutes) of validity.
     public static let `default` = AccessTokenPolicy.useCache(minTTL: 180)
 }

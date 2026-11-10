@@ -8,7 +8,7 @@ import Foundation
 /// ### How to use
 /// - Define an enum `MethodKey` listing the methods you want to observe.
 /// - Add stored properties:
-///     - `var methosCallsCounts: [MethodKey: Int] = [:]`
+///     - `var invocationsCount: [MethodKey: Int] = [:]`
 ///     - `var failingMethos: [(method: MethodKey, error: Error)] = []`
 /// - At the start of each spied method:
 ///     1) call `increment(_:)`
@@ -35,7 +35,7 @@ public protocol ProviderSpyProtocol: AnyObject {
     var failingMethos: [(method: MethodKey, error: Error)] { get set }
 
     /// Increase the call count for `method` by 1.
-    /// - Parameter method: Method to increment in `methosCallsCounts`.
+    /// - Parameter method: Method to increment in `invocationsCount`.
     func increment(_ method: MethodKey)
 
     /// Reset **all** call counters back to 0.

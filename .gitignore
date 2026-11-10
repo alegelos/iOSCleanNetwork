@@ -1,8 +1,12 @@
 .DS_Store
-/.build
+**/.build/
+.unlazy/
 /Packages
 xcuserdata/
 DerivedData/
 .swiftpm/configuration/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
+__pycache__/
+skills/ioscleannetwork/assets/UserExample/.swiftpm/
+skills/ioscleannetwork/assets/UserExample/Package.resolved

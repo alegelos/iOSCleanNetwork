@@ -3,6 +3,8 @@ import iOSCleanNetwork
 
 /// Mock implementation of `NetworkSessionProtocol` that loads response data
 /// from a local JSON file instead of performing a real network call.
+/// It does not build `setup.request`, validate HTTP status codes or provide configurable
+/// HTTP responses. Test outgoing requests and HTTP error/retry behavior separately.
 public final class MockedURLSession: NetworkSessionProtocol {
 
     public init() {}

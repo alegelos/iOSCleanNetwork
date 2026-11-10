@@ -5,8 +5,9 @@ import Foundation
 /// - **`baseURL`**: The root URL for all endpoint requests built by this provider.
 /// - **`session`**: The network session responsible for executing `URLRequest`s and returning responses.
 ///
-/// Conforming types centralize their configuration (base URL and session) to keep client code concise
-/// and allow shared request construction logic to operate on a common interface.
+/// This optional protocol exposes configuration only; it provides no request execution
+/// or decoding implementation. Consumer providers can instead conform directly to their
+/// feature's Domain protocol and inject a `NetworkSessionProtocol`.
 public protocol ApiProvider {
 
     /// Root URL used to construct each endpoint’s full URL.
