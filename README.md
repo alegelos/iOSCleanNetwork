@@ -9,8 +9,11 @@ Requires **Swift 6.2+** and **iOS 15+**. All examples use fictional users and
 
 ## Start here
 
-- **Integrating with an AI agent:** follow [README_AI.md](README_AI.md) to install
-  the reusable `ioscleannetwork` skill in the consuming project.
+- **Integrating with an AI agent:** install the
+  [CleanNetwork plugin](https://github.com/alegelos/CleanNetworkPlugin) for Codex
+  or Claude Code, then use it in your consuming project.
+  [Installation and first request](README_AI.md#install-the-plugin-recommended).
+  Copilot users can [install the standalone skill](README_AI.md#install-the-standalone-skill-alternative).
 - **Integrating by hand:** read the [integration guide](skills/ioscleannetwork/references/integration.md)
   and the [complete User example](skills/ioscleannetwork/assets/UserExample/).
 - **Changing this SDK:** read [AGENTS.md](AGENTS.md).
@@ -138,8 +141,16 @@ these boundaries and the exact contracts.
 ## AI-assisted integration
 
 Installing the Swift package does **not** install instructions into an agent.
-Use [README_AI.md](README_AI.md) to install the skill or connect the guide to
-your app's instruction file. The skill uses the open
+For Codex and Claude Code, install the
+[CleanNetwork plugin](README_AI.md#install-the-plugin-recommended) to make the
+integration guides, examples and testing workflow available to your agent.
+One installation includes both the iOS and Android skills. Start a new session
+in your consumer project and explicitly select the iOS skill for your first
+request. The plugin is optional and the SDK dependency is installed separately.
+
+For Copilot or a project-local setup, use the
+[standalone skill](README_AI.md#install-the-standalone-skill-alternative).
+The skill uses the open
 [Agent Skills format](https://agentskills.io/specification); discovery and
 invocation depend on the agent client. An instruction file improves context;
 compilation, tests and review establish whether generated code is correct.
